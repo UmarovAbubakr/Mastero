@@ -1,0 +1,167 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String?
+  name      String
+  role      String   @default("client") // "client" or "worker"
+  phone     String?
+  bio       String?
+  avatar    String?
+  googleId  String?  @unique
+  appleId   String?  @unique
+  telegramId String? @unique
+  worker    Worker?
+  orders    Order[]        @relation("ClientOrders")
+  bookings  BookingSlot[]  @relation("ClientBookings")
+  conversations Conversation[] @relation("ConversationParticipants")
+  sentMessages  Message[]      @relation("SentMessages")
+  jobRequests   JobRequest[]   @relation("ClientJobRequests")
+  subscriptionTier   String   @default("FREE") // "FREE", "PRO", "ULTRA"
+  subscriptionExpiresAt DateTime?
+  subscriptionStatus   String   @default("ACTIVE") // "ACTIVE", "CANCELED", "PAST_DUE"
+  transactions      Transaction[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Transaction {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  amount    Int
+  currency  String   @default("USD")
+  status    String   @default("pending") // "pending", "completed", "failed"
+  stripeId  String?  @unique
+  tier      String
+  createdAt DateTime @default(now())
+}
+
+model Worker {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  skills    String
+  category  String   @default("other")
+  about     String
+  price     Int
+  city      String   @default("Dushanbe")
+  verified        Boolean  @default(false)
+  rating          Float    @default(5.0)
+  latitude        Float?
+  longitude       Float?
+  certificateUrl  String?
+  completedOrders Int      @default(0)
+  totalEarnings   Int      @default(0)
+  works           Work[]
+  orders          Order[]
+  proposals       Proposal[]
+  slots           BookingSlot[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model JobRequest {
+  id          String   @id @default(uuid())
+  clientId    String
+  client      User     @relation("ClientJobRequests", fields: [clientId], references: [id])
+  title       String
+  description String
+  category    String
+  budget      Int?
+  city        String   @default("Dushanbe")
+  imageUrl    String?
+  status      String   @default("open") // "open", "closed", "completed"
+  proposals   Proposal[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Proposal {
+  id           String     @id @default(uuid())
+  jobRequestId String
+  jobRequest   JobRequest @relation(fields: [jobRequestId], references: [id])
+  workerId     String
+  worker       Worker     @relation(fields: [workerId], references: [id])
+  message      String
+  price        Int?
+  status       String     @default("pending") // "pending", "accepted", "rejected"
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model Work {
+  id             String   @id @default(uuid())
+  workerId       String
+  worker         Worker   @relation(fields: [workerId], references: [id])
+  title          String
+  imageUrl       String
+  beforeImageUrl String?
+  afterImageUrl  String?
+  isBeforeAfter  Boolean  @default(false)
+  createdAt      DateTime @default(now())
+}
+
+model BookingSlot {
+  id        String   @id @default(uuid())
+  workerId  String
+  worker    Worker   @relation(fields: [workerId], references: [id])
+  startTime DateTime
+  endTime   DateTime
+  isBooked  Boolean  @default(false)
+  clientId  String?
+  client    User?    @relation("ClientBookings", fields: [clientId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model Order {
+  id        String   @id @default(uuid())
+  clientId  String
+  client    User     @relation("ClientOrders", fields: [clientId], references: [id])
+  workerId  String
+  worker    Worker   @relation(fields: [workerId], references: [id])
+  status    String   @default("pending") // "pending", "accepted", "declined", "completed"
+  rating    Float?
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Conversation {
+  id           String    @id @default(uuid())
+  participants User[]    @relation("ConversationParticipants")
+  messages     Message[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Message {
+  id             String       @id @default(uuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  senderId       String
+  sender         User         @relation("SentMessages", fields: [senderId], references: [id])
+  content        String
+  imageUrl       String?
+  isEdited       Boolean      @default(false)
+  reactions      Reaction[]
+  createdAt      DateTime     @default(now())
+}
+
+model Reaction {
+  id        String   @id @default(uuid())
+  messageId String
+  message   Message  @relation(fields: [messageId], references: [id])
+  userId    String
+  emoji     String
+  createdAt DateTime @default(now())
+}
