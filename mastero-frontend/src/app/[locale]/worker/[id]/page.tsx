@@ -153,11 +153,11 @@ export default function WorkerProfilePage() {
         initial="hidden"
         animate="visible"
         variants={containerVariants}
-        className="max-w-6xl mx-auto relative z-10"
+        className="max-w-6xl mx-auto relative z-10 pt-32 px-4 md:px-6"
       >
         
         <motion.div variants={itemVariants}>
-          <Link href="/search" className="inline-flex items-center text-slate-400 hover:text-white mb-8 transition-colors group text-sm font-bold uppercase tracking-widest">
+          <Link href="/search" className="inline-flex items-center text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-white mb-8 transition-colors group text-sm font-bold uppercase tracking-widest">
             <ChevronLeft className="mr-2 h-4 w-4 group-hover:-translate-x-1 transition-transform" />
             {t('back_to_search')}
           </Link>
