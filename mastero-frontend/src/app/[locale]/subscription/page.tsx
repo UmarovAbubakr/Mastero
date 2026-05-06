@@ -21,7 +21,7 @@ const PricingPage = () => {
       try {
         const token = localStorage.getItem('token');
         if (!token) return;
-        const res = await axios.get(`${BACKEND_URL}/api/subscriptions/status`, {
+        const res = await axios.get(`${BACKEND_URL}/subscriptions/status`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         setCurrentTier(res.data.subscriptionTier);
@@ -42,7 +42,7 @@ const PricingPage = () => {
       }
 
       const res = await axios.post(
-        `${BACKEND_URL}/api/subscriptions/checkout`,
+        `${BACKEND_URL}/subscriptions/checkout`,
         { tier },
         { headers: { Authorization: `Bearer ${token}` } }
       );
