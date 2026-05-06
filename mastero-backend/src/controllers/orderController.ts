@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import prisma from '../utils/prisma';
 import { AuthRequest } from '../middleware/auth';
+import { sendTelegramNotification } from '../telegram/bot';
 
 export const createOrder = async (req: AuthRequest, res: Response) => {
   try {
@@ -18,6 +19,28 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
     });
 
     res.status(201).json(order);
+
+    // Notify worker via Telegram
+    try {
+      const workerData = await prisma.worker.findUnique({
+        where: { id: workerId },
+        include: { user: { select: { telegramId: true } } }
+      });
+
+      const clientData = await prisma.user.findUnique({
+        where: { id: clientId },
+        select: { name: true }
+      });
+
+      if (workerData?.user?.telegramId) {
+        await sendTelegramNotification(
+          workerData.user.telegramId,
+          `📦 <b>Новый заказ!</b>\n\nКлиент <b>${clientData?.name}</b> хочет заказать ваши услуги.\n\nПроверьте раздел заказов в приложении.`
+        );
+      }
+    } catch (tgError) {
+      console.error('Telegram notification error:', tgError);
+    }
   } catch (error) {
     console.error('Create order error:', error);
     res.status(500).json({ error: 'Failed to create order' });
@@ -105,6 +128,32 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response) => {
     }
 
     res.json(updated);
+
+    // Notify client via Telegram
+    try {
+      const clientData = await prisma.user.findUnique({
+        where: { id: order.clientId },
+        select: { telegramId: true }
+      });
+
+      const workerUser = await prisma.user.findUnique({
+        where: { id: order.worker.userId },
+        select: { name: true }
+      });
+
+      if (clientData?.telegramId) {
+        let message = '';
+        if (status === 'accepted') message = `✅ <b>Ваш заказ принят!</b>\n\nМастер <b>${workerUser?.name}</b> приступил к работе.`;
+        if (status === 'declined') message = `❌ <b>Заказ отклонен</b>\n\nК сожалению, мастер <b>${workerUser?.name}</b> не может выполнить работу сейчас.`;
+        if (status === 'completed') message = `🏁 <b>Работа завершена!</b>\n\nМастер <b>${workerUser?.name}</b> пометил заказ как выполненный. Пожалуйста, оставьте отзыв!`;
+
+        if (message) {
+          await sendTelegramNotification(clientData.telegramId, message);
+        }
+      }
+    } catch (tgError) {
+      console.error('Telegram notification error:', tgError);
+    }
   } catch (error) {
     res.status(500).json({ error: 'Failed to update order' });
   }
@@ -146,6 +195,23 @@ export const rateOrder = async (req: AuthRequest, res: Response) => {
     });
 
     res.json(updatedOrder);
+
+    // Notify worker via Telegram about new rating
+    try {
+      const workerData = await prisma.worker.findUnique({
+        where: { id: order.workerId },
+        include: { user: { select: { telegramId: true } } }
+      });
+
+      if (workerData?.user?.telegramId) {
+        await sendTelegramNotification(
+          workerData.user.telegramId,
+          `⭐ <b>Новый отзыв!</b>\n\nКлиент поставил вам оценку: <b>${rating} / 5</b>\nКомментарий: <i>${comment || 'Без комментария'}</i>`
+        );
+      }
+    } catch (tgError) {
+      console.error('Telegram notification error:', tgError);
+    }
   } catch (error) {
     console.error('Rating error:', error);
     res.status(500).json({ error: 'Failed to rate order' });

@@ -42,7 +42,7 @@ export const createJobRequest = async (req: AuthRequest, res: Response) => {
                       `${description.substring(0, 100)}${description.length > 100 ? '...' : ''}\n\n` +
                       `💰 Бюджет: ${budget || 'Договорная'}\n` +
                       `📍 Город: ${city || 'Душанбе'}\n\n` +
-                      `<a href="http://localhost:3000/search">Посмотреть на сайте</a>`;
+                      `<a href="${process.env.FRONTEND_URL || 'https://mastero-beta.vercel.app'}/search">Посмотреть на сайте</a>`;
           sendTelegramNotification(worker.user.telegramId, msg);
         }
       }
@@ -145,6 +145,28 @@ export const createProposal = async (req: AuthRequest, res: Response) => {
     });
 
     res.status(201).json(proposal);
+
+    // Notify client via Telegram
+    try {
+      const job = await (prisma as any).jobRequest.findUnique({
+        where: { id: jobRequestId },
+        include: { client: { select: { telegramId: true } } }
+      });
+
+      const workerUser = await prisma.user.findUnique({
+        where: { id: worker.userId },
+        select: { name: true }
+      });
+
+      if (job?.client?.telegramId) {
+        await sendTelegramNotification(
+          job.client.telegramId,
+          `💡 <b>Новое предложение!</b>\n\nМастер <b>${workerUser?.name}</b> откликнулся на ваш заказ "<b>${job.title}</b>".\n\nПредложенная цена: <b>${price || 'Договорная'}</b>`
+        );
+      }
+    } catch (tgError) {
+      console.error('Telegram notification error:', tgError);
+    }
   } catch (error) {
     console.error('Create proposal error:', error);
     res.status(500).json({ error: 'Failed to create proposal' });
@@ -195,6 +217,23 @@ export const acceptProposal = async (req: AuthRequest, res: Response) => {
     });
 
     res.json({ message: 'Proposal accepted', order });
+
+    // Notify worker via Telegram
+    try {
+      const workerUser = await prisma.user.findUnique({
+        where: { id: proposal.worker.userId },
+        select: { telegramId: true }
+      });
+
+      if (workerUser?.telegramId) {
+        await sendTelegramNotification(
+          workerUser.telegramId,
+          `🎉 <b>Вас выбрали исполнителем!</b>\n\nКлиент принял ваше предложение по заказу "<b>${proposal.jobRequest.title}</b>".\n\nСвяжитесь с клиентом для уточнения деталей.`
+        );
+      }
+    } catch (tgError) {
+      console.error('Telegram notification error:', tgError);
+    }
   } catch (error) {
     console.error('Accept proposal error:', error);
     res.status(500).json({ error: 'Failed to accept proposal' });
